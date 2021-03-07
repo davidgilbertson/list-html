@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 
 const childProcess = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const http = require('http');
 
-const html = `
+const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,22 +81,33 @@ const parseDeps = (depObject, treeCounter = 0) => {
   return [deps, treeCounter];
 };
 
-console.info('Getting list of packages...');
+const serveFile = html => {
+  const PORT = 19841;
 
+  const server = http
+    .createServer((req, res) => {
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Connection', 'close');
+      res.end(html);
+
+      console.info('Results served, closing server');
+      server.close();
+    })
+    .listen(PORT, () => {
+      const start = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+      const exec = `${start} http://localhost:${PORT}`;
+
+      console.info(`Serving results at http://localhost:${PORT}`);
+      childProcess.exec(exec);
+    });
+};
+
+console.info('Running npm ls --json...');
 childProcess.exec('npm ls --json', {maxBuffer: 5000 * 1024}, (err, stdout) => {
   const list = JSON.parse(stdout);
   const [parsed] = parseDeps(list.dependencies);
 
-  const htmlWithData = html.replace('%REPLACE_ME%', JSON.stringify(parsed));
+  const html = htmlTemplate.replace('%REPLACE_ME%', JSON.stringify(parsed));
 
-  const outputFilePath = path.resolve(__dirname, 'npm-list.html');
-
-  fs.writeFileSync(outputFilePath, htmlWithData);
-
-  console.info(`Created ${outputFilePath}, attempting to open...`);
-
-  const start = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-
-  const exec = `${start} file://${outputFilePath}`;
-  childProcess.exec(exec);
+  serveFile(html);
 });
