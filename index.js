@@ -14,48 +14,47 @@ const makeHtml = (depCount, depData) => `
         font-family: system-ui, sans-serif;
         color: #333;
       }
-      .dep {
+      details {
         margin-left: 16px;
-      }
-      .name-only {
-        margin-left: 12px;
       }
     </style>
   </head>
   <body>
-    <h1>You depend on ${depCount.toLocaleString()} npm packages</h1>
+    <h1>Your project depends on ${depCount.toLocaleString()} npm packages</h1>
     <div id="app"></div>
-    
+
+    <hr>
+
+    <small>Note, numbers show <em>unique</em> package counts, so won’t add up when multiple child packages depend on the same package</small>
+
     <script>window.__DEPS__ = ${JSON.stringify(depData)}</script>
-    
+
     <script>
       const makeDepEl = (dep) => {
-        const depBodyEl = document.createElement('div');
-        depBodyEl.classList.add('dep');
-    
+        const detailsEl = document.createElement('details');
+
+        const summaryEl = document.createElement('summary');
+        summaryEl.textContent = dep.name + ' (' + dep.descendantCount.toLocaleString() + ')';
+        detailsEl.appendChild(summaryEl);
+
+        const detailBodyEl = document.createElement('div');
+
         if (dep.dependencies.length) {
-          const detailsEl = document.createElement('details');
-          const summaryEl = document.createElement('summary');
-          summaryEl.textContent = dep.name + ' (' + dep.descendantCount.toLocaleString() + ')';
-    
-          detailsEl.appendChild(summaryEl);
-    
-          dep.dependencies.forEach(dep2 => {
-            depBodyEl.appendChild(makeDepEl(dep2));
+          dep.dependencies.forEach(subDep => {
+            detailBodyEl.appendChild(makeDepEl(subDep));
           });
-    
-          detailsEl.appendChild(depBodyEl);
-    
-          return detailsEl;
+        } else {
+          const nameOnlyEl = document.createElement('div');
+          nameOnlyEl.textContent = 'No dependencies';
+          detailBodyEl.appendChild(nameOnlyEl);
         }
-    
-        depBodyEl.classList.add('name-only');
-        depBodyEl.textContent = dep.name;
-    
-        return depBodyEl;
+
+        detailsEl.appendChild(detailBodyEl);
+
+        return detailsEl;
       }
-    
-    
+
+
       window.__DEPS__.forEach(dep => {
         document.getElementById('app').appendChild(makeDepEl(dep));
       });
@@ -64,23 +63,30 @@ const makeHtml = (depCount, depData) => `
 </html>
 `;
 
-const parseDeps = (depObject, treeCounter = 0) => {
-  const deps = Object.entries(depObject).map(([name, data]) => {
-    const [dependencies, descendantCount] = parseDeps(data.dependencies || {});
+const parseListData = listData => {
+  const parseDeps = (depObject, packages = new Set()) => {
+    const deps = Object.entries(depObject).map(([name, data]) => {
+      packages.add(name);
+      const [dependencies, descendantPackages] = parseDeps(data.dependencies || {});
 
-    treeCounter += descendantCount + 1;
+      descendantPackages.forEach(item => packages.add(item));
 
-    return {
-      name,
-      descendantCount,
-      version: data.version,
-      dependencies,
-    };
-  });
+      return {
+        name,
+        descendantCount: descendantPackages.size,
+        version: data.version,
+        dependencies,
+      };
+    });
 
-  deps.sort((a, b) => b.descendantCount - a.descendantCount);
+    deps.sort((a, b) => b.descendantCount - a.descendantCount);
 
-  return [deps, treeCounter];
+    return [deps, packages];
+  };
+
+  const [parsedDeps, packageNames] = parseDeps(listData.dependencies);
+
+  return [parsedDeps, packageNames.size];
 };
 
 const serveFile = html => {
@@ -108,7 +114,7 @@ const serveFile = html => {
 console.info('Running npm ls --json...');
 childProcess.exec('npm ls --json', {maxBuffer: 5000 * 1024}, (err, stdout) => {
   const list = JSON.parse(stdout);
-  const [depData, depCount] = parseDeps(list.dependencies);
+  const [depData, depCount] = parseListData(list);
 
   const html = makeHtml(depCount, depData);
 
