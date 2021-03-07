@@ -1,6 +1,6 @@
 {
   "name": "list-html",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Runs npm list and outputs to html",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,9 @@
     "type": "git",
     "url": "git+https://github.com/davidgilbertson/list-html.git"
   },
-  "keywords": ["npm list ls explore packages"],
+  "keywords": [
+    "npm list ls explore packages"
+  ],
   "author": "David Gilbertson",
   "license": "MIT",
   "bugs": {
