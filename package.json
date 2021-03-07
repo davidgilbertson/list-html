@@ -1,6 +1,6 @@
 {
   "name": "list-html",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Runs npm list and outputs to html",
   "main": "index.js",
   "scripts": {
